@@ -1,0 +1,92 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = env.DOCKER_IMAGE ?: 'your-dockerhub-username/express-mongodb-app'
+        DOCKER_TAG = "${env.BUILD_ID}"
+        DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
+        MONGODB_URI = 'mongodb://root:example@localhost:27018/expressdb_test'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh 'npm run lint'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                script {
+                    try {
+                        // Start MongoDB container for testing
+                        sh 'docker-compose -f docker-compose.test.yml up -d mongo'
+                        // Wait for MongoDB to be ready
+                        sh 'sleep 10'
+                        sh 'npm test'
+                    } finally {
+                        sh 'docker-compose -f docker-compose.test.yml down'
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKER_CREDENTIALS) {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                        docker.image("${DOCKER_IMAGE}:latest").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sshagent(['staging-server-credentials']) {
+                    sh """
+                        ssh user@staging-server \
+                        "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && \
+                        docker-compose -f /opt/app/docker-compose.staging.yml up -d"
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            slackSend(color: 'good', message: "Build ${env.BUILD_NUMBER} succeeded!")
+        }
+        failure {
+            slackSend(color: 'danger', message: "Build ${env.BUILD_NUMBER} failed!")
+        }
+    }
+}
