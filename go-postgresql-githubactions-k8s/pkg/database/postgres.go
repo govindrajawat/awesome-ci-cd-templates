@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	
 	_ "github.com/lib/pq"
 )
@@ -34,7 +35,8 @@ func RunMigrations(db *sql.DB) error {
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS messages (
 			id SERIAL PRIMARY KEY,
-			content TEXT NOT NULL
+			content TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	return err

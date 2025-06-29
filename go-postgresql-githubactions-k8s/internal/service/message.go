@@ -17,16 +17,20 @@ func (s *MessageService) GetAll() ([]repository.Message, error) {
 }
 
 func (s *MessageService) Create(content string) (repository.Message, error) {
+	// Check if this is the first message and create default if needed
 	messages, err := s.repo.GetAll()
 	if err != nil {
 		return repository.Message{}, err
 	}
 	
 	if len(messages) == 0 {
-		if err := s.repo.Create("Hello, World!"); err != nil {
+		// Create default message first
+		_, err := s.repo.Create("Hello, World!")
+		if err != nil {
 			return repository.Message{}, err
 		}
 	}
 	
+	// Create the requested message
 	return s.repo.Create(content)
 }
