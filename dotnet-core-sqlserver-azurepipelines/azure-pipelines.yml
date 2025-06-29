@@ -1,0 +1,114 @@
+trigger:
+- main
+
+variables:
+  dockerRegistryServiceConnection: 'your-docker-registry-service-connection'
+  imageRepository: 'dotnet-core-sqlserver-app'
+  containerRegistry: 'yourcontainerregistry.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+  
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and test
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+      
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: Restore dependencies
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+        
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration Release'
+        
+    - task: DotNetCoreCLI@2
+      displayName: Test
+      inputs:
+        command: 'test'
+        projects: '**/*Tests/*.csproj'
+        arguments: '--configuration Release --collect:"XPlat Code Coverage"'
+        
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish code coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
+
+- stage: BuildAndPushDockerImage
+  displayName: Build and push Docker image
+  dependsOn: Build
+  condition: succeeded()
+  
+  jobs:
+  - job: Docker
+    displayName: Docker
+    pool:
+      vmImage: $(vmImageName)
+      
+    steps:
+    - task: Docker@2
+      displayName: Login to container registry
+      inputs:
+        command: 'login'
+        containerRegistry: $(dockerRegistryServiceConnection)
+        
+    - task: Docker@2
+      displayName: Build and push
+      inputs:
+        command: 'buildAndPush'
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
+
+- stage: DeployToStaging
+  displayName: Deploy to staging
+  dependsOn: BuildAndPushDockerImage
+  condition: succeeded()
+  
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy
+    environment: 'staging'
+    pool:
+      vmImage: $(vmImageName)
+      
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy to staging'
+            inputs:
+              azureSubscription: 'your-azure-subscription'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Pull the latest image
+                az acr login --name $(containerRegistry)
+                docker pull $(containerRegistry)/$(imageRepository):$(tag)
+                
+                # Deploy to Azure App Service or Kubernetes
+                # Example for Azure Web App:
+                az webapp config container set \
+                  --name your-webapp-name \
+                  --resource-group your-resource-group \
+                  --docker-custom-image-name $(containerRegistry)/$(imageRepository):$(tag) \
+                  --docker-registry-server-url https://$(containerRegistry) \
+                  --docker-registry-server-user $(ACR_USERNAME) \
+                  --docker-registry-server-password $(ACR_PASSWORD)
