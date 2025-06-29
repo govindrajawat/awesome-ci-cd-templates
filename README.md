@@ -38,7 +38,7 @@ Help developers and DevOps engineers quickly set up CI/CD pipelines across diffe
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/awesome-ci-cd-templates.git
+   git clone https://github.com/govindrajawat/awesome-ci-cd-templates.git
    cd awesome-ci-cd-templates
    ```
 

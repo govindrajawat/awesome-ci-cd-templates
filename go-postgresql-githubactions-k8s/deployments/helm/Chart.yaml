@@ -1,5 +1,20 @@
 apiVersion: v2
-name: go-postgres-app
-description: A Helm chart for Go + PostgreSQL application
-version: 0.1.0
-appVersion: "1.0"
+name: go-postgresql-app
+description: Go PostgreSQL CI/CD Template Helm Chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - go
+  - postgresql
+  - ci-cd
+  - kubernetes
+  - helm
+home: https://github.com/govindrajawat/awesome-ci-cd-templates
+sources:
+  - https://github.com/govindrajawat/awesome-ci-cd-templates
+maintainers:
+  - name: Govind Rajawat
+    email: govindrajawat260398@gmail.com
+    url: https://github.com/govindrajawat
+license: MIT
