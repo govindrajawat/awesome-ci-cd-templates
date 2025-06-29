@@ -1,0 +1,26 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/your-username/go-postgres-app
+  pullPolicy: Always
+  tag: "latest"
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8080
+
+database:
+  host: postgres-service
+  port: 5432
+  user: postgres
+  password: postgres
+  name: postgres
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

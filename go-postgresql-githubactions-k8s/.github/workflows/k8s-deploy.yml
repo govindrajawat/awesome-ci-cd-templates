@@ -1,0 +1,42 @@
+name: Kubernetes Deployment
+
+on:
+  workflow_run:
+    workflows: ["Go CI/CD Pipeline"]
+    branches: [main]
+    types:
+      - completed
+
+env:
+  DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/go-postgres-app
+  DOCKER_TAG: ${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+    
+    - name: Deploy to Kubernetes
+      env:
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      run: |
+        echo "$KUBE_CONFIG" > kubeconfig.yaml
+        export KUBECONFIG=kubeconfig.yaml
+        
+        # Update image in deployment
+        kubectl set image deployment/go-postgres-app go-postgres-app=${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+        
+        # Wait for deployment to be ready
+        kubectl rollout status deployment/go-postgres-app --timeout=300s
+        
+        # Verify health check
+        sleep 30
+        kubectl port-forward service/go-postgres-app 8080:80 &
+        sleep 10
+        curl -f http://localhost:8080/health || exit 1
